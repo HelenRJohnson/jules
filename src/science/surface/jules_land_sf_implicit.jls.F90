@@ -32,14 +32,13 @@ CONTAINS
 SUBROUTINE jules_land_sf_implicit (                                            &
 ! IN values defining field dimensions and subset to be processed :
  land_pts,land_index,nsurft,surft_index,surft_pts,sm_levels,                   &
- canhc_surft,canopy,flake,smc_soilt,tile_frac,                                 &
- non_irrig_frac,wt_ext_surft,fland,flandg,                                     &
+ canhc_surft,canopy,flake,smc_soilt,tile_frac,wt_ext_surft,fland,flandg,       &
 ! IN values defining water tracer field dimensions
  n_wtrac_jls, n_evap_srce,                                                     &
 ! IN everything not covered so far :
  lw_down,sw_surft,sky,t_soil_soilt,r_gamma,alpha1,ashtf_prime_surft,           &
  dtrdz_charney_grid_1,fracaero_t,fracaero_s,resfs,resft,rhokh_surft,           &
- emis_surft,snow_surft,dtstar_surft,                                           &
+ emis_surft,fsnow,snow_surft,dtstar_surft,                                     &
 ! INOUT data :
  tstar_surft,fqw_surft,fqw_1,ftl_1,ftl_surft,sf_diag,                          &
 ! OUT Diagnostic not requiring STASH flags :
@@ -89,7 +88,7 @@ USE theta_field_sizes,        ONLY: t_i_length, t_j_length
 USE jules_surface_mod,        ONLY: l_aggregate, l_flake_model, ls
 
 USE jules_snow_mod,           ONLY:                                            &
-  nsmax, rho_snow_const, cansnowtile, l_snow_nocan_hc
+  nsmax, rho_snow_const, cansnowtile, i_snow_tile, l_snow_nocan_hc
 
 USE jules_surface_types_mod,  ONLY: lake
 
@@ -162,8 +161,6 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 ,tile_frac(land_pts,nsurft)                                                    &
                              ! IN Tile fractions including
                              !    snow cover in the ice tile.
-,non_irrig_frac(land_pts)                                                      &
-                             ! IN Fraction of non-irrigated tiles.
 ,wt_ext_surft(land_pts,sm_levels,nsurft)                                       &
                              ! IN Fraction of evapotranspiration
                              !    extracted from each soil layer
@@ -174,6 +171,8 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN Land fraction on all pts.
 ,emis_surft(land_pts,nsurft)                                                   &
                              ! IN Emissivity for land tiles
+,fsnow(land_pts,nsurft)                                                        &
+                             ! IN Snow cover fractions on tiles
 ,snow_surft(land_pts,nsurft)                                                   &
                              ! IN Lying snow on tiles (kg/m2)
 ,dtstar_surft(land_pts,nsurft)
@@ -570,8 +569,7 @@ CALL sf_evap (                                                                 &
   land_pts,nsurft,                                                             &
   land_index,surft_index,surft_pts,sm_levels,fland,                            &
   ashtf_prime_surft,canopy,dtrdz_charney_grid_1,flake,fracaero_t,fracaero_s,   &
-  snow_surft,resfs,resft,rhokh_surft,tile_frac,non_irrig_frac,                 &
-  smc_soilt,wt_ext_surft,                                                      &
+  fsnow,snow_surft,resfs,resft,rhokh_surft,tile_frac,smc_soilt,wt_ext_surft,   &
   timestep,r_gamma,fqw_1,fqw_surft,ftl_1,ftl_surft,tstar_surft,                &
   ecan,ecan_surft,elake_surft,esoil_soilt,esoil_surft,ei_surft,ext_soilt,      &
   sf_diag, non_lake_frac,                                                      &
@@ -802,6 +800,19 @@ ELSE
                                      lw_down_elevcorr_surft(l,n)
       END DO
 !$OMP END DO
+      ! Tiles with partial snow cover
+      IF (i_snow_tile(n) == 1) THEN
+        DO k = 1,surft_pts(n)
+          l = surft_index(k,n)
+          j = (land_index(l) - 1) / tdims%i_end + 1
+          i = land_index(l) - (j-1) * tdims%i_end
+          sf_diag%lw_up_surft(l,n) =                                           &
+            (1.0 - fsnow(i,n))*sf_diag%lw_up_surft(l,n) + fsnow(i,n) *         &
+                     (emis_surft(l,nsurft) * sbcon * tstar_surft(l,nsurft)**4  &
+                      + (1.0 - emis_surft(l,nsurft)) *                         &
+                        (lw_down(i,j) + lw_down_elevcorr_surft(l,nsurft)))
+        END DO
+      END IF
     END DO
   END IF
 END IF

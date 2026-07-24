@@ -347,8 +347,14 @@ CASE (mt_single_column)
   sf_diag%l_resp_p = .TRUE.
 
 CASE (mt_lfric)
-
-  ! Requests are configured in LFRic
+  sf_diag%l_z0h_eff_gb = .TRUE.
+  sf_diag%l_z0m_gb  = .TRUE.
+  sf_diag%su10    = .TRUE.
+  sf_diag%sv10    = .TRUE.
+  sf_diag%l_gpp   = .TRUE.
+  sf_diag%st1p5   = .TRUE.
+  sf_diag%sq1p5   = .TRUE.
+  sf_diag%l_resp_p = .TRUE.
 
 END SELECT
 
@@ -701,7 +707,15 @@ CASE (mt_single_column)
 
 CASE (mt_lfric)
 
-  ! Requests are configured in LFRic
+  sf_diag%su10    = .TRUE.        ! Calculate u10m
+  sf_diag%sv10    = .TRUE.        !    "      v10m
+  sf_diag%slh     = .TRUE.        !    "      latent_heat
+  sf_diag%sq1p5   = .TRUE.        !    "      q1p5m
+  sf_diag%st1p5   = .TRUE.        !    "      t1p5m
+  sf_diag%simlt   = .TRUE.        !    "      sice_mlt_htf
+  sf_diag%smlt    = .TRUE.        !    "      snomlt_surf_htf
+  sf_diag%l_lw_surft = .TRUE.     !    "      lw_up_surft & lw_down_surft
+  sf_diag%l_lw_up_sice_weighted_cat = .TRUE.  ! " lw_up_sice_weighted_cat
 
 END SELECT
 

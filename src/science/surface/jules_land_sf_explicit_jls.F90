@@ -39,8 +39,8 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  bq_1,bt_1,z1_uv,z1_uv_top,z1_tq,z1_tq_top,qw_1,tl_1,                          &
 ! IN soil/vegetation/land surface data :
  land_index,nsurft,sm_levels,canopy,catch,catch_snow,hcon_soilt,               &
- ho2r2_orog, flandg,                                                           &
- snow_surft,sil_orog_land,smvccl_soilt,smvcst_soilt,smvcwt_soilt,sthf_soilt,   &
+ ho2r2_orog, flandg, fsnow,                                                    &
+ sil_orog_land,smvccl_soilt,smvcst_soilt,smvcwt_soilt,sthf_soilt,              &
  sthu_soilt,z0_surft,z0h_surft_bare, z0m_soil_in,                              &
 ! IN input data from the wave model
  charnock_w,                                                                   &
@@ -69,7 +69,7 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  chr1p5m,smc_soilt,hcons_soilt,gpp,npp,resp_p,g_leaf,gpp_pft,npp_pft,          &
  resp_p_pft,resp_s_soilt,resp_s_tot_soilt,resp_l_pft,resp_r_pft,               &
  resp_w_pft,n_leaf,n_root,n_stem,lai_bal,gc_surft,canhc_surft,wt_ext_surft,    &
- flake,surft_index,surft_pts,tile_frac,non_irrig_frac,fsmc_pft,emis_soil,      &
+ flake,surft_index,surft_pts,tile_frac,fsmc_pft,emis_soil,                     &
  growth_sug_pft,growth_sug_gb,f_nsc_pft,lwp_c_pft,psi_root_zone_pft,           &
 ! OUT required for classic aerosols
  cd_land,rib_surft,ch_surft_classic,cd_std_classic,                            &
@@ -99,9 +99,10 @@ SUBROUTINE jules_land_sf_explicit (                                            &
  wrr_gb,                                                                       &
  !Fluxes (IN OUT)
  anthrop_heat_surft,                                                           &
- !prognostics (IN)
- nsnow_surft, sice_surft, sliq_surft, snowdepth_surft,                         &
-                        tsnow_surft, ds_surft,                                 &
+ !snow prognostics (IN)
+ nsnow_surft, sice_surft, sliq_surft, tsnow_surft, ds_surft,                   &
+ !snow prognostics (IN OUT)
+ snowdepth_surft, snow_surft,                                                  &
  !c_elevate (OUT)
  surf_hgt_surft, lw_down_elevcorr_surft,                                       &
  !jules_mod (OUT)
@@ -160,7 +161,6 @@ USE urbanz0_mod,                ONLY: urbanz0
 USE veg_param,                  ONLY: secs_per_360days
 USE veg3_field_mod,             ONLY: veg_state_type
 USE water_constants_mod,        ONLY: lc, rho_ice, tm
-USE c_irrigation_mod,           ONLY: irrig_tile
 
 USE jules_soil_biogeochem_mod, ONLY:                                           &
 ! imported scalar parameters
@@ -170,8 +170,8 @@ USE jules_soil_biogeochem_mod, ONLY:                                           &
 
 USE jules_soil_mod, ONLY: dzsoil, dzsoil_elev, hcice, hcwat, hcondeep
 
-USE jules_surface_types_mod, ONLY: npft, nnpft, ntype,                         &
-                                   urban_canyon, urban_roof, soil, lake, ncpft
+USE jules_surface_types_mod, ONLY: npft, ncpft, nnpft, ntype,                  &
+                                   urban_canyon, urban_roof, soil, lake, ice
 
 #if defined(UM_JULES)
 USE atm_step_local, ONLY:  dim_cs1, co2_dim_len,co2_dim_row
@@ -182,6 +182,7 @@ USE ancil_info, ONLY:  dim_cs1, co2_dim_len, co2_dim_row
 USE jules_snow_mod, ONLY: cansnowtile                                          &
                           ,rho_snow_const                                      &
                           ,snow_hcon                                           &
+                          ,i_snow_tile                                         &
                           ,l_snowdep_surf                                      &
                           ,l_snow_nocan_hc                                     &
                           ,nsmax                                               &
@@ -198,7 +199,7 @@ USE jules_surface_mod, ONLY: l_aggregate, formdrag, l_anthrop_heat_src,        &
 USE jules_vegetation_mod, ONLY: can_model, can_rad_mod, ilayers, l_triffid,    &
                                 l_vegdrag_surft
 
-USE jules_irrig_mod, ONLY: l_irrig_dmd, irrig_option, tile_based_irrigation
+USE jules_irrig_mod, ONLY: l_irrig_dmd
 
 USE jules_sea_seaice_mod, ONLY: l_ctile, charnock, ip_ss_solid
 
@@ -308,11 +309,11 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
 ,catch_snow(land_pts,nsurft)                                                   &
                              ! IN Snow interception capacity of
                              !    tiles (kg/m2).
+,fsnow(land_pts,nsurft)                                                        &
+                             ! IN Snow cover fractions on tiles
 ,hcon_soilt(land_pts,nsoilt)                                                   &
                              ! IN Soil thermal conductivity
                              !    (W/m/K).
-,snow_surft(land_pts,nsurft)                                                   &
-                             ! IN Lying snow on tiles (kg/m2)
 ,smvccl_soilt(land_pts,nsoilt,sm_levels)                                       &
                              ! IN Critical volumetric SMC
                              !    (cubic m per cubic m of soil).
@@ -620,8 +621,6 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
 ,tile_frac(land_pts,nsurft)                                                    &
                              ! OUT Tile fractions including
                              !     snow cover in the ice tile.
-,non_irrig_frac(land_pts)                                                      &
-                             ! OUT Fraction of non-irrigated tiles.
 ,fsmc_pft(land_pts,npft)                                                       &
                              ! OUT Moisture availability factor.
 ,gc_corr(land_pts,npft)                                                        &
@@ -710,13 +709,16 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
         wt_ext_irr_surft(land_pts,sm_levels,nsurft)
 REAL(KIND=real_jlslsm), INTENT(OUT) :: gc_irr_surft(land_pts,nsurft)
 
-!prognostics (IN)
+!snow prognostics (IN)
 INTEGER, INTENT(IN) :: nsnow_surft(land_pts,nsurft)
 REAL(KIND=real_jlslsm), INTENT(IN) :: sice_surft(land_pts,nsurft,nsmax),       &
                                       sliq_surft(land_pts,nsurft,nsmax),       &
-                                      snowdepth_surft(land_pts,nsurft),        &
                                       tsnow_surft(land_pts,nsurft,nsmax),      &
                                       ds_surft(land_pts,nsurft,nsmax)
+
+!snow prognostics (IN OUT)
+REAL(KIND=real_jlslsm), INTENT(IN OUT) :: snowdepth_surft(land_pts,nsurft),    &
+                                          snow_surft(land_pts,nsurft)
 
 !c_elevate (OUT)
 REAL(KIND=real_jlslsm), INTENT(OUT) :: surf_hgt_surft(land_pts,nsurft),        &
@@ -1190,21 +1192,6 @@ IF ( l_anthrop_heat_src .AND. .NOT. l_aggregate ) THEN
                                   anthrop_heat_surft)
 END IF
 
-! Set up non irrigated fraction
-non_irrig_frac(:) = 1.0
-IF (irrig_option == tile_based_irrigation) THEN
-  DO n = 1,ntype
-    IF (irrig_tile(n) > 0) THEN
-!$OMP PARALLEL DO SCHEDULE(STATIC) DEFAULT(NONE) PRIVATE(l)                    &
-!$OMP SHARED(land_pts, non_irrig_frac, frac, n)
-      DO l = 1, land_pts
-        non_irrig_frac(l) =  non_irrig_frac(l) - frac(l,n)
-      END DO
-!$OMP END PARALLEL DO
-    END IF
-  END DO
-END IF
-
 !-----------------------------------------------------------------------
 ! Call physiology routine to calculate surface conductances and carbon
 ! fluxes.
@@ -1214,8 +1201,7 @@ CALL physiol (                                                                 &
   sm_levels,nsurft,n_wtrac_jls,surft_pts,surft_index,                          &
   dim_cs1,                                                                     &
   co2_mmr,co2_3d,co2_dim_len, co2_dim_row,l_co2_interactive,                   &
-  can_model,cs_pool_soilt,veg_state,frac,non_irrig_frac,                       &
-  canht_pft,photosynth_act_rad,                                                &
+  can_model,cs_pool_soilt,veg_state,frac,canht_pft,photosynth_act_rad,         &
   lai_pft,pstar,qw_1,sthu_soilt,sthf_soilt,t_soil_soilt,tstar_surft,           &
   smvccl_soilt,smvcst_soilt,smvcwt_soilt,vshr,z0_surft,z1_uv,o3,               &
   canhc_surft,vfrac_surft,emis_surft,l_emis_surft_set,emis_soil,flake,         &
@@ -1449,6 +1435,28 @@ ELSE
       tile_frac(l,n) = frac(l,n)
     END DO
 !$OMP END PARALLEL DO
+  END DO
+END IF
+
+!-----------------------------------------------------------------------
+! Modify tile fractions and zero snow mass and depth on selected tiles
+! if using the ice tile as a separate snow tile.
+!-----------------------------------------------------------------------
+IF (ANY(i_snow_tile == 1)) THEN
+  DO l = 1, land_pts
+    IF (.NOT. l_lice_point(l)) tile_frac(l,ice) = 0.0
+  END DO
+  DO n = 1,nsurft-1
+    DO l = 1, land_pts
+      tile_frac(l,n) = frac(l,n)
+      IF (i_snow_tile(n) == 1) THEN
+        snow_surft(l,n) = 0.0
+        snowdep_surft(l,n) = 0.0
+        snowdepth_surft(l,n) = 0.0
+        tile_frac(l,n) = (1 - fsnow(l,n))*frac(l,n)
+        tile_frac(l,ice) = tile_frac(l,ice) + fsnow(l,n)*frac(l,n)
+      END IF
+    END DO
   END DO
 END IF
 
