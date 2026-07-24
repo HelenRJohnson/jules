@@ -554,8 +554,8 @@ CASE ( jules )
     !IN soil/vegetation/land surface data :
     ainfo%land_index,nsurft,sm_levels,progs%canopy_surft,psparms%catch_surft,  &
     psparms%catch_snow_surft, psparms%hcon_soilt,jules_vars%ho2r2_orog_gb,     &
-    flandg_tmp,                                                                &
-    progs%snow_surft,jules_vars%sil_orog_land_gb,psparms%smvccl_soilt,         &
+    flandg_tmp, fluxes%fsnow,                                                  &
+    jules_vars%sil_orog_land_gb,psparms%smvccl_soilt,                          &
     psparms%smvcst_soilt,psparms%smvcwt_soilt,                                 &
     psparms%sthf_soilt, psparms%sthu_soilt,psparms%z0_surft,                   &
     psparms%z0h_bare_surft, psparms%z0m_soil_gb,                               &
@@ -600,8 +600,7 @@ CASE ( jules )
     trif_vars%n_leaf_pft,trif_vars%n_root_pft,trif_vars%n_stem_pft,            &
     trif_vars%lai_bal_pft,                                                     &
     progs%gc_surft,canhc_surft,wt_ext_surft,flake,                             &
-    ainfo%surft_index,surft_pts,tile_frac,ainfo%non_irrig_frac,                &
-    fluxes%fsmc_pft,emis_soil,                                                 &
+    ainfo%surft_index,surft_pts,tile_frac,fluxes%fsmc_pft,emis_soil,           &
     trifctltype%growth_sug_pft,trifctltype%growth_sug_gb,progs%f_nsc_pft,      &
     trifctltype%lwp_c_pft, trifctltype%psi_root_zone_pft,                      &
     ! OUT required for classic aerosols
@@ -637,9 +636,11 @@ CASE ( jules )
     urban_param%wrr_gb,                                                        &
     !Fluxes (IN OUT)
     fluxes%anthrop_heat_surft,                                                 &
-    !prognostics (IN)
+    !snow prognostics (IN)
     progs%nsnow_surft, progs%sice_surft, progs%sliq_surft,                     &
-    progs%snowdepth_surft, progs%tsnow_surft, progs%ds_surft,                  &
+    progs%tsnow_surft, progs%ds_surft,                                         &
+    !snow prognostics (IN OUT)
+    progs%snowdepth_surft, progs%snow_surft,                                   &
     !c_elevate (OUT)
     jules_vars%surf_hgt_surft, jules_vars%lw_down_elevcorr_surft,              &
     !jules_vars_mod (OUT)
@@ -813,7 +814,6 @@ CASE ( cable )
   flake(:,:) = 0.0
   hcons_soilt(:,:) = 0.0
   tile_frac(:,:) = 0.0
-  ainfo%non_irrig_frac(:) = 1.0
 
   progs_cbl%SoilTemp_CABLE(:,:,:) = 0.0
   progs_cbl%SoilMoisture_CABLE(:,:,:) = 0.0

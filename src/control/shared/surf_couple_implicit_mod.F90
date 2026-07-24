@@ -438,7 +438,7 @@ CASE ( jules )
             land_pts,ainfo%land_index,nsurft,ainfo%surft_index,surft_pts,      &
             sm_levels,                                                         &
             canhc_surft,progs%canopy_surft,flake,progs%smc_soilt,tile_frac,    &
-            ainfo%non_irrig_frac,wt_ext_surft,coast%fland,flandg,              &
+            wt_ext_surft,coast%fland,flandg,                                   &
     !IN values defining water tracer field dimensions
             n_wtrac_jls, n_evap_srce,                                          &
     ! IN everything not covered so far :
@@ -446,7 +446,7 @@ CASE ( jules )
             alpha1,ashtf_surft,                                                &
             jules_vars%dtrdz_charney_grid_1_ij,fracaero_t,fracaero_s,          &
             resfs,resft, rhokh_surft,                                          &
-            fluxes%emis_surft,progs%snow_surft,dtstar_surft,                   &
+            fluxes%emis_surft,fluxes%fsnow,progs%snow_surft,dtstar_surft,      &
     ! INOUT data :
             progs%tstar_surft,fluxes%fqw_surft,fqw_1,ftl_1,fluxes%ftl_surft,   &
             sf_diag,                                                           &

@@ -128,7 +128,7 @@ USE work_vars_mod_cbl,  ONLY: work_vars_type      ! and some kept thru timestep
 !Import interfaces to subroutines called
 USE hydrol_mod,               ONLY: hydrol
 USE snow_mod,                 ONLY: snow
-USE jules_rivers_mod,         ONLY: l_rivers, rivers_call
+USE jules_rivers_mod,         ONLY: l_rivers, l_inland, rivers_call
 
 ! Code which isn't currently suitable for building into LFRic
 #if !defined(LFRIC)
@@ -190,8 +190,7 @@ USE jules_deposition_mod,     ONLY: l_deposition, l_deposition_from_ukca
 USE deposition_from_surf_couple_extra_mod,                                     &
                               ONLY: deposition_from_surf_couple_extra
 
-USE jules_hydrology_mod,      ONLY: l_hydrology, l_pdm, l_top, l_var_rainfrac, &
-                                    l_inland
+USE jules_hydrology_mod,      ONLY: l_hydrology, l_pdm, l_top, l_var_rainfrac
 
 USE lake_mod, ONLY:    h_snow_sw_att                                           &
                      , trap_frozen                                             &
@@ -704,9 +703,9 @@ CASE ( jules )
                 fluxes%melt_surft,fluxes%snowinc_surft,                        &
                 progs%smcl_soilt(:,:,1),psparms%sthf_soilt(:,:,1),             &
                 fluxes%surf_htf_surft, progs%t_soil_soilt(:,:,1),              &
-                progs%tsurf_elev_surft, progs%tstar_surft,                     &
+                progs%tsurf_elev_surft, progs%tstar_surft, psparms%z0_surft,   &
                 psparms%smvcst_soilt(:,:,1), con_snow_wtrac,                   &
-                wtrac_jls%ei_surft, progs%rgrain_surft,                        &
+                wtrac_jls%ei_surft, fluxes%fsnow, progs%rgrain_surft,          &
                 progs%rgrainl_surft, progs%rho_snow_grnd_surft,                &
                 progs%sice_surft,progs%sliq_surft,progs%snow_grnd_surft,       &
                 progs%snow_surft, progs%snowdepth_surft, progs%tsnow_surft,    &
