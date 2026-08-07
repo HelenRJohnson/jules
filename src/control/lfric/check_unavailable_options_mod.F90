@@ -22,7 +22,7 @@ USE ereport_mod, ONLY: ereport
 USE log_mod,     ONLY: log_event, log_scratch_space, log_level_warning
 
 USE jules_surface_mod, ONLY: l_anthrop_heat_src, anthrop_heat_option, dukes,   &
-                             l_flake_model, l_aggregate, l_elev_land_ice,      &
+                             l_aggregate, l_elev_land_ice,      &
                              l_elev_lw_down, l_point_data
 
 IMPLICIT NONE
@@ -40,13 +40,6 @@ IF ( l_anthrop_heat_src .AND. anthrop_heat_option /= dukes ) THEN
      ": Only the DUKES (0) anthopogenic heat option is available. " //         &
      "anthrop_heat_option = ", anthrop_heat_option,                            &
      ". Please see LFRic apps ticket #1009 for details."
-  CALL log_event(RoutineName//": "//TRIM(log_scratch_space), log_level_warning)
-END IF
-
-IF ( l_flake_model ) THEN
-  error_sum = error_sum + 1
-  WRITE(log_scratch_space,'(I0,A,L1)') error_sum,                              &
-     ": FLake is not available to LFRic. l_flake_model = ", l_flake_model
   CALL log_event(RoutineName//": "//TRIM(log_scratch_space), log_level_warning)
 END IF
 
