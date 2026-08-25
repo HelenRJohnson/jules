@@ -129,6 +129,7 @@ USE work_vars_mod_cbl,  ONLY: work_vars_type      ! and some kept thru timestep
 USE hydrol_mod,               ONLY: hydrol
 USE snow_mod,                 ONLY: snow
 USE jules_rivers_mod,         ONLY: l_rivers, rivers_call
+USE flake_interface_mod,      ONLY: flake_interface
 
 ! Code which isn't currently suitable for building into LFRic
 #if !defined(LFRIC)
@@ -140,7 +141,6 @@ USE veg_control_mod,          ONLY: veg_control
 USE next_gen_biogeochem_mod,  ONLY: next_gen_biogeochem
 USE sparm_mod,                ONLY: sparm
 USE infiltration_rate_mod,    ONLY: infiltration_rate
-USE flake_interface_mod,      ONLY: flake_interface
 
 !ifdef required to manage the different science payloads available for
 !coupled and standalone use
@@ -278,6 +278,7 @@ USE yomhook,                     ONLY: lhook, dr_hook
 USE ereport_mod,                 ONLY: ereport
 USE jules_print_mgr,             ONLY: jules_message, jules_print
 USE jules_model_environment_mod, ONLY: lsm_id, jules, cable
+USE log_mod,                     ONLY: log_event, log_scratch_space, log_level_warning
 
 
 IMPLICIT NONE
@@ -1192,7 +1193,21 @@ CASE ( jules )
     END IF
     ! End of standalone Jules code
 #endif
+    
+    ! End of code excluded from LFRic builds
+#else
+    ! These variables are intent out and so must be initialised for LFRic to
+    ! compile. Set to rmdi in the hope this will show errors if they are used!
+  fluxes%rrun_gb = rmdi
+  fluxes%rflow_gb = rmdi
+  psparms%z0_surft = rmdi
+  psparms%z0h_bare_surft = rmdi
 
+  IF (land_pts > 0) THEN
+
+    ! End of bespoke LFRic code
+#endif
+    
     !-----------------------------------------------------------------------
     !     call to the FLake interface
     !-----------------------------------------------------------------------
@@ -1283,20 +1298,6 @@ CASE ( jules )
       END IF
 
     END IF ! Flake
-
-    ! End of code excluded from LFRic builds
-#else
-    ! These variables are intent out and so must be initialised for LFRic to
-    ! compile. Set to rmdi in the hope this will show errors if they are used!
-  fluxes%rrun_gb = rmdi
-  fluxes%rflow_gb = rmdi
-  psparms%z0_surft = rmdi
-  psparms%z0h_bare_surft = rmdi
-
-  IF (land_pts > 0) THEN
-
-    ! End of bespoke LFRic code
-#endif
 
     !End of science calls
     !===========================================================================
