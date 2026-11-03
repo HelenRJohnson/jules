@@ -278,7 +278,6 @@ USE yomhook,                     ONLY: lhook, dr_hook
 USE ereport_mod,                 ONLY: ereport
 USE jules_print_mgr,             ONLY: jules_message, jules_print
 USE jules_model_environment_mod, ONLY: lsm_id, jules, cable
-USE log_mod,                     ONLY: log_event, log_scratch_space, log_level_warning
 
 
 IMPLICIT NONE
