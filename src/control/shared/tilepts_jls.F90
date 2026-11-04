@@ -1,5 +1,5 @@
 ! Some of the content of this file has been produced with the assistance
-! of Met Office GitHub Copilot Business - GPT-6.1 Sol. 
+! of Met Office GitHub Copilot Business - GPT-6.1 Sol.
 ! *****************************COPYRIGHT*******************************
 ! (C) Crown copyright Met Office. All rights reserved.
 ! For further details please refer to the file COPYRIGHT.txt
@@ -72,7 +72,7 @@ END DO
 !$OMP PARALLEL DO DEFAULT(NONE) SCHEDULE(STATIC)                               &
 !$OMP SHARED( ntype, land_pts, surft_index, all_tiles, frac, ice,              &
 !$OMP         elev_ice, elev_rock, l_lice_point, l_lice_surft,                 &
-!$OMP         l_elev_land_ice, surft_pts, i_snow_tile, snow_tile )                                     &
+!$OMP         l_elev_land_ice, surft_pts, i_snow_tile, snow_tile )             &
 !$OMP PRIVATE( l, n, c, use_tile )
 
 DO n = 1,ntype

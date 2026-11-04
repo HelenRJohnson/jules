@@ -765,7 +765,7 @@ DO m = 1,sm_levels
         IF (non_lake_frac(l) > EPSILON(0.0)) THEN
           ext_soilt(l,1,m) = ext_soilt(l,1,m) / non_lake_frac(l)
         END IF
-      END DO 
+      END DO
 !$OMP END DO
     END IF
   END IF

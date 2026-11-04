@@ -163,7 +163,7 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                              ! IN Tile fractions including
                              !    snow cover in the ice tile.
 ,non_irrig_frac(land_pts)                                                      &
-                             ! IN Fraction of non-irrigated tiles. 
+                             ! IN Fraction of non-irrigated tiles.
 ,wt_ext_surft(land_pts,sm_levels,nsurft)                                       &
                              ! IN Fraction of evapotranspiration
                              !    extracted from each soil layer
