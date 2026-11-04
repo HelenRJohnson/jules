@@ -1,3 +1,5 @@
+! Some of the content of this file has been produced with the assistance
+! of Met Office GitHub Copilot Business - GPT-6.1 Sol. 
 ! *****************************COPYRIGHT*******************************
 ! (C) Crown copyright Met Office. All rights reserved.
 ! For further details please refer to the file COPYRIGHT.txt
@@ -59,15 +61,20 @@ CHARACTER(LEN=*), PARAMETER :: RoutineName='TILEPTS'
 
 IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
+! First, set values of snow_tile before entering parallel region:
+DO l = 1, land_pts
+  snow_tile(l) = ANY((i_snow_tile(1:ntype) == 1) .AND. (frac(l,:) > 0.0))
+END DO
+
 !-----------------------------------------------------------------------
 ! Create the surft_index array of land points with each surface type
 !-----------------------------------------------------------------------
 !$OMP PARALLEL DO DEFAULT(NONE) SCHEDULE(STATIC)                               &
 !$OMP SHARED( ntype, land_pts, surft_index, all_tiles, frac, ice,              &
 !$OMP         elev_ice, elev_rock, l_lice_point, l_lice_surft,                 &
-!$OMP         l_elev_land_ice, surft_pts )                                     &
+!$OMP         l_elev_land_ice, surft_pts, i_snow_tile, snow_tile )                                     &
 !$OMP PRIVATE( l, n, c, use_tile )
-snow_tile(:) = .FALSE.
+
 DO n = 1,ntype
   c = 0
   l_lice_surft(n) = ( n == ice .OR. ANY(elev_ice == n) )
@@ -83,9 +90,7 @@ DO n = 1,ntype
         use_tile = .TRUE.
       ! Ice tile can be used as a separate snow tile
       IF (ANY(i_snow_tile == 1)) THEN
-        IF (i_snow_tile(n) == 1 .AND. frac(l,n) > 0.0) THEN
-          snow_tile(l) = .TRUE.
-        ELSE IF (n == ice .AND. snow_tile(l)) THEN
+        IF (n == ice .AND. snow_tile(l)) THEN
           use_tile = .TRUE.
         END IF
       END IF
