@@ -64,6 +64,8 @@ TYPE :: psparms_data_type
     ! the pft variable fsmc_p0 are used instead.
   REAL(KIND=real_jlslsm), ALLOCATABLE :: clay_soilt(:,:,:)
     ! Fraction of clay (kg clay/kg soil).
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: soot_flux_gb(:)
+    ! Mass flux of black carbon being deposited onto surface (kg/m2/s)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: albsoil_soilt(:,:)
     ! Soil albedo
   REAL(KIND=real_jlslsm), ALLOCATABLE :: albobs_sw_gb(:)
@@ -112,6 +114,7 @@ TYPE :: psparms_type
   REAL(KIND=real_jlslsm), POINTER :: v_close_pft(:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: v_open_pft(:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: clay_soilt(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: soot_flux_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: albsoil_soilt(:,:)
   REAL(KIND=real_jlslsm), POINTER :: albobs_sw_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: albobs_vis_gb(:)
@@ -173,6 +176,7 @@ ALLOCATE(psparms_data%smvccl_soilt(land_pts,nsoilt,sm_levels))
 ALLOCATE(psparms_data%smvcwt_soilt(land_pts,nsoilt,sm_levels))
 ALLOCATE(psparms_data%smvcst_soilt(land_pts,nsoilt,sm_levels))
 ALLOCATE(psparms_data%clay_soilt(land_pts,nsoilt,dim_cslayer))
+ALLOCATE(psparms_data%soot_flux_gb(land_pts))
 
 psparms_data%bexp_soilt(:,:,:)   = 0.0
 psparms_data%sathh_soilt(:,:,:)  = 0.0
@@ -183,6 +187,7 @@ psparms_data%smvccl_soilt(:,:,:) = 0.0
 psparms_data%smvcwt_soilt(:,:,:) = 0.0
 psparms_data%smvcst_soilt(:,:,:) = 0.0
 psparms_data%clay_soilt(:,:,:)   = 0.0
+psparms_data%soot_flux_gb(:)     = 0.0
 
 ! Plant and soil parameters
 ALLOCATE(psparms_data%albsoil_soilt(land_pts,nsoilt))
@@ -269,6 +274,7 @@ DEALLOCATE(psparms_data%smvccl_soilt)
 DEALLOCATE(psparms_data%smvcwt_soilt)
 DEALLOCATE(psparms_data%smvcst_soilt)
 DEALLOCATE(psparms_data%clay_soilt)
+DEALLOCATE(psparms_data%soot_flux_gb)
 DEALLOCATE(psparms_data%albsoil_soilt)
 DEALLOCATE(psparms_data%albobs_sw_gb)
 DEALLOCATE(psparms_data%albobs_vis_gb)
@@ -328,6 +334,7 @@ psparms%smvccl_soilt => psparms_data%smvccl_soilt
 psparms%smvcwt_soilt => psparms_data%smvcwt_soilt
 psparms%smvcst_soilt => psparms_data%smvcst_soilt
 psparms%clay_soilt => psparms_data%clay_soilt
+psparms%soot_flux_gb => psparms_data%soot_flux_gb
 psparms%albsoil_soilt => psparms_data%albsoil_soilt
 psparms%albobs_sw_gb => psparms_data%albobs_sw_gb
 psparms%albobs_vis_gb => psparms_data%albobs_vis_gb
@@ -383,6 +390,7 @@ NULLIFY(psparms%smvccl_soilt)
 NULLIFY(psparms%smvcwt_soilt)
 NULLIFY(psparms%smvcst_soilt)
 NULLIFY(psparms%clay_soilt)
+NULLIFY(psparms%soot_flux_gb)
 NULLIFY(psparms%albsoil_soilt)
 NULLIFY(psparms%albobs_sw_gb)
 NULLIFY(psparms%albobs_vis_gb)

@@ -727,7 +727,8 @@ CASE ( jules )
                 lake_vars%lake_h_ice_gb, lake_vars%hcon_lake,                  &
                 lake_vars%ts1_lake_gb, lake_vars%lake_snow_melt,               &
                 lake_vars%non_lake_frac, lake_vars%lake_h_mxl_gb,              &
-                lake_vars%lake_depth_gb)
+                lake_vars%lake_depth_gb, progs%soot_mass, progs%sootm_tot,     &
+                fluxes%soot_out, psparms%soot_flux_gb)
 
     IF (l_wtrac_jls) THEN
 

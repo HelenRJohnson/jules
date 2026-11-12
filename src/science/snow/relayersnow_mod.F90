@@ -22,7 +22,8 @@ SUBROUTINE relayersnow( land_pts, surft_pts, n_wtrac_jls, surft_index,         &
                         rgrain0, rho0, sice0, snowfall, snowmass,              &
                         tsnow0, sice0_wtrac, nsnow, ds, rgrain, rgrainl, sice, &
                         rho_snow_grnd, sliq, tsnow, sice_wtrac, sliq_wtrac,    &
-                        rho_snow, snowdepth )
+                        rho_snow, snowdepth, soot_mass, sm0, sootm_tot,        &
+                        soot_out )
 
 USE layersnow_mod, ONLY: layersnow
 
@@ -87,6 +88,8 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   sice0(land_pts),                                                             &
      ! Ice content of fresh snow (kg/m2).
      ! Where nsnow=0, sice0 is the mass of the snowpack.
+  sm0(land_pts),                                                               &
+     ! Mass of soot in fresh snow (kg/m2).
   snowfall(land_pts),                                                          &
      ! Total frozen precip reaching the ground (kg/m2).
   snowmass(land_pts),                                                          &
@@ -116,6 +119,12 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Ice content of snow layers (kg/m2).
   sliq(land_pts,nsmax),                                                        &
     ! Liquid content of snow layers (kg/m2).
+  soot_mass(land_pts,nsmax),                                                   &
+    ! Soot mass on snow layers (kg/m2).
+  soot_out(land_pts),                                                          &
+    ! Soot mass removed from snowpack with melting (kg/m2).
+  sootm_tot(land_pts),                                                         &
+    ! Total soot mass in the snowpack (kg/m2).
   tsnow(land_pts,nsmax),                                                       &
     ! Snow layer temperatures (K).
   sice_wtrac(land_pts,nsmax,n_wtrac_jls),                                      &
@@ -165,6 +174,10 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Areal heat capacity of layer (J/K/m2).
   oldremains,                                                                  &
     ! Remaining depth in an old layer (m).
+  soot_remains,                                                                &
+    ! Remaining mass of soot in an old layer (kg/m2).
+    ! Used for moving soot between snow layers when layer depth is
+    ! less than the thin_snow_limit.
   wt
     ! Weight given to a layer value.
 
@@ -186,6 +199,8 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Grain size before adjustment (kg/m2).
   s(0:nsmax),                                                                  &
     ! Ice content before adjustment (kg/m2).
+  sm(0:nsmax),                                                                 &
+    ! Soot mass before adjustment (kg/m2).
   w(0:nsmax),                                                                  &
     ! Liquid content before adjustment (kg/m2).
   u(nsmax)
@@ -317,7 +332,7 @@ DO k = 1,surft_pts
 
   IF ( nsnow(i) > 0 ) THEN
     !-------------------------------------------------------------------------
-    ! Store previous snow layer energy and mass contents
+    ! Store previous snow layer energy, mass and soot contents
     !-------------------------------------------------------------------------
     csnow = sice0(i) * hcapi
     e(0)  = csnow * ( tsnow0(i) - tm )
@@ -339,13 +354,15 @@ DO k = 1,surft_pts
         CALL ereport(routinename, errcode, ERRMSG)
       END SELECT
     END IF
-    s(0) = sice0(i)
-    w(0) = 0.0
+    s(0)  = sice0(i)
+    sm(0) = sm0(i)
+    w(0)  = 0.0
     DO n = 1,nold(i)
       csnow = sice(i,n) * hcapi + sliq(i,n) * hcapw
       e(n)  = csnow * ( tsnow(i,n) - tm )
       r(n)  = rgrainl(i,n)
       s(n)  = sice(i,n)
+      sm(n) = soot_mass(i,n)
       w(n)  = sliq(i,n)
     END DO
 
@@ -366,10 +383,11 @@ DO k = 1,surft_pts
     ! Initialise accumulations for new layer values.
     !-------------------------------------------------------------------------
     DO n = 1, nsmax
-      u(n)         = 0.0
-      sice(i,n)    = 0.0
-      sliq(i,n)    = 0.0
-      rgrainl(i,n) = 0.0
+      u(n)           = 0.0
+      sice(i,n)      = 0.0
+      sliq(i,n)      = 0.0
+      soot_mass(i,n) = 0.0
+      rgrainl(i,n)   = 0.0
     END DO
 
     IF (l_wtrac_jls) THEN
@@ -397,7 +415,8 @@ DO k = 1,surft_pts
     DO old = 0,nold(i)
 
       ! All of this old layer remains to be reassigned to new layer(s).
-      oldremains = d0(i,old)
+      oldremains   = d0(i,old)
+      soot_remains = sm(old)
 
       ! Point to first new layer with remaining space.
       izz = iznew
@@ -422,6 +441,8 @@ DO k = 1,surft_pts
             u(new)      = u(new) + e(old) * wt
             sice(i,new) = sice(i,new) + s(old) * wt
             sliq(i,new) = sliq(i,new) + w(old) * wt
+            soot_mass(i,new) = soot_mass(i,new) + sm(old) * wt
+            soot_remains = soot_remains - sm(old) * wt
 
             IF (l_wtrac_jls) THEN
               ! Repeat for water tracers
@@ -445,6 +466,12 @@ DO k = 1,surft_pts
               ERRMSG  = 'Unrecognised option for relayering the snowpack.'
               CALL ereport(routinename, errcode, ERRMSG)
             END SELECT
+          ELSE IF (d0(i,old) >= 0.0 .AND. d0(i,old) <= thin_snow_limit) THEN
+            errcode = -1
+            ERRMSG  = 'newremains is less than the thin snow limit, soot ' //  &
+                      'will be lost'
+            CALL ereport(routinename, errcode, ERRMSG)
+            ! Will put snow and soot in next layer instead.
           END IF
 
           ! Update the pointer to the next new layer with space.
@@ -463,6 +490,7 @@ DO k = 1,surft_pts
             u(new)      = u(new) + e(old) * wt
             sice(i,new) = sice(i,new) + s(old) * wt
             sliq(i,new) = sliq(i,new) + w(old) * wt
+            soot_mass(i,new) = soot_mass(i,new) + sm(old) * wt
 
             IF (l_wtrac_jls) THEN
               ! Repeat for water tracers
@@ -484,6 +512,8 @@ DO k = 1,surft_pts
               ERRMSG  = 'Unrecognised option for relayering the snowpack.'
               CALL ereport(routinename, errcode, ERRMSG)
             END SELECT
+          ELSE IF (d0(i,old) >= 0.0 .AND. d0(i,old) <= thin_snow_limit) THEN
+            soot_mass(i,new) = soot_mass(i,new) + soot_remains
           END IF
           ! Proceed to the next old layer by exiting from the new layer loop.
           EXIT
@@ -532,9 +562,12 @@ DO k = 1,surft_pts
     ! Note that because the bulk density is not calculated for nsnow=0 and
     ! snowmass>0, it remains constant (until the pack is exhausted or it
     ! grows to nsnow=1).
+    ! Once the snow is (effectively) gone, soot is removed from the snowpack.
     !-------------------------------------------------------------------------
     IF ( snowmass(i) < 1.0e-9 ) THEN
       rho_snow_grnd(i) = rho_snow_fresh
+      soot_out (i) = soot_out(i) + sootm_tot(i)
+      sootm_tot(i) = 0.0
     ELSE IF ( l_rho_snow_corr ) THEN
       !-----------------------------------------------------------------------
       ! Diagnose bulk density of pack. On most occasions this density is
@@ -556,6 +589,7 @@ DO k = 1,surft_pts
       rho_snow(i,n)  = 0.0
       sice(i,n)      = 0.0
       sliq(i,n)      = 0.0
+      soot_mass(i,n) = 0.0
       tsnow(i,n)     = tm
     END DO
 

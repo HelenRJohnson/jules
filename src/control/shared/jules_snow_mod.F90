@@ -247,6 +247,9 @@ REAL(KIND=real_jlslsm) ::                                                      &
   snowunloadfact = 0.4,                                                        &
                 ! Constant in relationship between canopy snow unloading and
                 ! canopy snow melt rate
+  soot_scav = 0.17,                                                            &
+                ! Fractional scavenging efficiency for the removal of soot
+                ! from snow with meltwater. Value must be between 0 and 1.
   rho_firn_albedo = 550.0,                                                     &
                 ! Threshold surface density where albedo parameterisation
                 ! switches to scaling with surface density not grain size
@@ -316,8 +319,8 @@ NAMELIST  / jules_snow/                                                        &
     r0, rmax, snow_ggr, amax, aicemax, maskd, dtland, kland_numerator,         &
 ! Other snow parameters
     rho_snow_const, rho_snow_fresh, rho_firn_albedo,                           &
-    snow_hcon, snow_hcap, snowliqcap,                                          &
-    snowinterceptfact, snowloadlai, snowunloadfact, dzsnow, cansnowpft,        &
+    snow_hcon, snow_hcap, snowliqcap, snowinterceptfact,                       &
+    snowloadlai, snowunloadfact, soot_scav, dzsnow, cansnowpft,                &
     unload_rate_cnst, unload_rate_u, can_clump, lai_alb_lim_sn,                &
     n_lai_exposed, l_snow_infilt, l_snow_nocan_hc,                             &
     i_grain_growth_opt, i_relayer_opt, i_basal_melting_opt
@@ -496,6 +499,9 @@ CALL jules_print('jules_snow', lineBuffer)
 WRITE(lineBuffer, *) '  snowunloadfact = ', snowunloadfact
 CALL jules_print('jules_snow', lineBuffer)
 
+WRITE(lineBuffer, *) '  soot_scav = ', soot_scav
+CALL jules_print('jules_snow', lineBuffer)
+
 WRITE(lineBuffer, *) '  dzsnow = ', dzsnow
 CALL jules_print('jules_snow', lineBuffer)
 
@@ -563,7 +569,7 @@ CHARACTER(LEN=errormessagelength) :: iomessage
 ! set number of each type of variable in my_namelist type
 INTEGER, PARAMETER :: no_of_types = 3
 INTEGER, PARAMETER :: n_int = 7
-INTEGER, PARAMETER :: n_real = 25 + snow_layers_max + 5 * npft_max
+INTEGER, PARAMETER :: n_real = 26 + snow_layers_max + 5 * npft_max
 INTEGER, PARAMETER :: n_log = 5 + npft_max
 
 TYPE :: my_namelist
@@ -592,6 +598,7 @@ TYPE :: my_namelist
   REAL(KIND=real_jlslsm) :: snowinterceptfact
   REAL(KIND=real_jlslsm) :: snowloadlai
   REAL(KIND=real_jlslsm) :: snowunloadfact
+  REAL(KIND=real_jlslsm) :: soot_scav
   REAL(KIND=real_jlslsm) :: a_snow_et
   REAL(KIND=real_jlslsm) :: b_snow_et
   REAL(KIND=real_jlslsm) :: c_snow_et
@@ -646,6 +653,7 @@ IF (mype == 0) THEN
   my_nml % snowinterceptfact   = snowinterceptfact
   my_nml % snowloadlai         = snowloadlai
   my_nml % snowunloadfact      = snowunloadfact
+  my_nml % soot_scav           = soot_scav
   my_nml % a_snow_et           = a_snow_et
   my_nml % b_snow_et           = b_snow_et
   my_nml % c_snow_et           = c_snow_et
@@ -693,6 +701,7 @@ IF (mype /= 0) THEN
   snowinterceptfact   = my_nml % snowinterceptfact
   snowloadlai         = my_nml % snowloadlai
   snowunloadfact      = my_nml % snowunloadfact
+  soot_scav           = my_nml % soot_scav
   a_snow_et           = my_nml % a_snow_et
   b_snow_et           = my_nml % b_snow_et
   c_snow_et           = my_nml % c_snow_et

@@ -57,6 +57,8 @@ TYPE :: fluxes_data_type
   REAL(KIND=real_jlslsm), ALLOCATABLE :: surf_ht_store_surft(:,:)
   ! Diagnostic to store values of C*(dT/dt) during calculation of energy
   ! balance
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: soot_out(:,:)
+  ! Soot flux out of the bottom of the snowpack with meltwater scavenging.
   REAL(KIND=real_jlslsm), ALLOCATABLE :: sw_sicat(:,:)
   ! Net SW on sea ice categories
   REAL(KIND=real_jlslsm), ALLOCATABLE :: alb_sicat(:,:,:)
@@ -177,6 +179,8 @@ TYPE :: fluxes_type
   REAL(KIND=real_jlslsm), POINTER :: surf_ht_store_surft(:,:)
   ! Diagnostic to store values of C*(dT/dt) during calculation of energy
   ! balance
+  REAL(KIND=real_jlslsm), POINTER :: soot_out(:,:)
+  ! Soot flux out of the bottom of the snowpack with meltwater scavenging.
   REAL(KIND=real_jlslsm), POINTER :: sw_sicat(:,:)
   ! Net SW on sea ice categories
   REAL(KIND=real_jlslsm), POINTER :: alb_sicat(:,:,:)
@@ -329,6 +333,7 @@ ALLOCATE(fluxes_data%sw_sicat(t_i_length * t_j_length, nice_use))
 ALLOCATE(fluxes_data%alb_sicat(t_i_length * t_j_length, nice_use, 4))
 ALLOCATE(fluxes_data%penabs_rad_frac(t_i_length * t_j_length, nice_use, 4))
 ALLOCATE(fluxes_data%sw_sea(t_i_length * t_j_length))
+ALLOCATE(fluxes_data%soot_out(land_pts, nsurft))
 
 fluxes_data%surf_ht_store_surft(:,:) = 0.0
 fluxes_data%anthrop_heat_surft(:,:)  = 0.0
@@ -336,6 +341,7 @@ fluxes_data%sw_sicat(:,:)            = 0.0
 fluxes_data%alb_sicat(:,:,:)         = 0.0
 fluxes_data%penabs_rad_frac(:,:,:)   = 0.0
 fluxes_data%sw_sea(:)                = 0.0
+fluxes_data%soot_out(:,:)            = 0.0
 
 ALLOCATE(fluxes_data%sub_surf_roff_gb(land_pts))
 ALLOCATE(fluxes_data%surf_roff_gb(land_pts))
@@ -456,6 +462,7 @@ DEALLOCATE(fluxes_data%sw_sicat)
 DEALLOCATE(fluxes_data%alb_sicat)
 DEALLOCATE(fluxes_data%penabs_rad_frac)
 DEALLOCATE(fluxes_data%sw_sea)
+DEALLOCATE(fluxes_data%soot_out)
 DEALLOCATE(fluxes_data%sub_surf_roff_gb)
 DEALLOCATE(fluxes_data%surf_roff_gb)
 DEALLOCATE(fluxes_data%alb_surft)
@@ -538,6 +545,7 @@ fluxes%sw_sicat => fluxes_data%sw_sicat
 fluxes%alb_sicat => fluxes_data%alb_sicat
 fluxes%penabs_rad_frac => fluxes_data%penabs_rad_frac
 fluxes%sw_sea => fluxes_data%sw_sea
+fluxes%soot_out => fluxes_data%soot_out
 fluxes%sub_surf_roff_gb => fluxes_data%sub_surf_roff_gb
 fluxes%surf_roff_gb => fluxes_data%surf_roff_gb
 fluxes%alb_surft => fluxes_data%alb_surft
@@ -616,6 +624,7 @@ NULLIFY(fluxes%sw_sicat)
 NULLIFY(fluxes%alb_sicat)
 NULLIFY(fluxes%penabs_rad_frac)
 NULLIFY(fluxes%sw_sea)
+NULLIFY(fluxes%soot_out)
 NULLIFY(fluxes%sub_surf_roff_gb)
 NULLIFY(fluxes%surf_roff_gb)
 NULLIFY(fluxes%alb_surft)

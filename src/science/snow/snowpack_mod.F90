@@ -33,11 +33,13 @@ SUBROUTINE snowpack ( surft_n, land_pts, surft_pts, n_wtrac_jls, timestep,     &
                       melt_surft_wtrac, sice_wtrac, sliq_wtrac,                &
                       snowfall_wtrac, snowmass_wtrac,                          &
                       snow_soil_htf, rho_snow, rho0, sice0, tsnow0,            &
-                      sice0_wtrac, sf_diag, non_lake_frac,                     &
+                      sice0_wtrac, sf_diag, non_lake_frac, sootm_tot, sm0,     &
+                      soot_mass, soot_out,                                     &
                       !Ancil info (IN)
                       l_lice_point, l_lice_surft,                              &
                       ! Types Variables
-                      lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
+                      lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb,             &
+                      soot_flux_gb)
 
 USE tridag_mod, ONLY: tridag
 
@@ -82,9 +84,11 @@ USE jules_snow_mod, ONLY:                                                      &
   rho_firn_pore_restrict,                                                      &
     ! Density at which ability of snowpack to hold/percolate
     ! water starts to be restricted.
-  rho_firn_pore_closure
+  rho_firn_pore_closure,                                                       &
     ! Density at which snowpack pores close off entirely and
     ! no additional melt can be held/percolated through.
+  soot_scav
+    ! Scavenging efficiency for the removal of soot from snow with meltwater.
 
 USE jules_water_tracers_mod, ONLY: l_wtrac_jls, wtrac_calc_ratio_fn_jules
 
@@ -94,6 +98,8 @@ USE parkind1, ONLY: jprb, jpim
 USE yomhook, ONLY: lhook, dr_hook
 
 USE um_types, ONLY: real_jlslsm
+
+USE ereport_mod, ONLY: ereport
 
 IMPLICIT NONE
 
@@ -168,8 +174,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
   ei_surft_wtrac(land_pts,nsurft,n_wtrac_jls),                                 &
     ! Water tracer sublimation of snow for all tiles (kg/m2/s).
     ! (Note, unlike the water equivalent, this is the full field for all tiles.)
-  infiltration_wtrac(land_pts,n_wtrac_jls)
+  infiltration_wtrac(land_pts,n_wtrac_jls),                                    &
     ! Water tracer content in rainfall infiltrating into snowpack (kg/m2).
+  soot_flux_gb(land_pts)
+    ! Mass flux of black carbon deposition onto surface (kg/m2/s).
 
 ! Array arguments with intent(inout)
 TYPE (strnewsfdiag), INTENT(IN OUT) :: sf_diag
@@ -191,6 +199,10 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Frozen precip reaching the ground (kg/m2).
   snowmass(land_pts),                                                          &
     ! Snow mass on the ground (kg/m2).
+  soot_mass(land_pts,nsmax),                                                   &
+    ! Soot mass on snow layers (kg/m2).
+  sootm_tot(land_pts),                                                         &
+    ! Total soot mass in the snowpack (kg/m2).
   tsnow(land_pts,nsmax),                                                       &
     ! Snow layer temperatures (K).
   t_soil1_soilt(land_pts),                                                     &
@@ -222,6 +234,11 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
   sice0(land_pts),                                                             &
     ! Ice content of fresh snow (kg/m2).
     ! Where nsnow=0, sice0 is the mass of the snowpack.
+  sm0(land_pts),                                                               &
+    ! Mass of soot in fresh snow (kg/m2)
+    ! Where NSNOW=0, sm0 is the mass of soot in the snowpack.
+  soot_out(land_pts),                                                          &
+    ! Mass of soot leaving the bottom of the snowpack (kg/m2).
   tsnow0(land_pts),                                                            &
     ! Temperature of fresh snow (K).
   rho_snow(land_pts,nsmax),                                                    &
@@ -279,6 +296,11 @@ REAL(KIND=real_jlslsm) ::                                                      &
     ! Melt of snow beneath canopy (kg/m2/s).
   smclf,                                                                       &
     ! Frozen soil moisture content of surface layer (kg/m2).
+  soot_down,                                                                   &
+    ! Amount of soot entering the layer having been washed down
+    ! with snowmelt from the layer above (kg/m2).
+  soot_conc,                                                                   &
+    ! Soot concentration in snow at start of the timestep (kg/kg).
   tile_frac_lake_adj,                                                          &
     ! Weighted share of the lake tile when it's divided up between tiles that
     ! have a soil column.
@@ -323,6 +345,9 @@ INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
 REAL(KIND=jprb)               :: zhook_handle
 
 CHARACTER(LEN=*), PARAMETER :: RoutineName='SNOWPACK'
+
+INTEGER                     :: errcode  ! Error code
+CHARACTER(LEN=880)          :: ERRMSG   ! Error message
 
 !-----------------------------------------------------------------------------
 
@@ -382,6 +407,29 @@ DO k = 1,surft_pts
   IF ( .NOT. cansnowtile ) g_snow_surf = g_snow_surf + lf * melt_surft(i)
 
   IF ( nsnow(i) == 0 ) THEN
+    ! Calculate soot concentration in snow before snowfall and sublimation
+    ! but after deposition (of snow through reverse sublimation).
+    IF ( snowmass(i) > 0.0 ) THEN
+      IF (ei_surft(i) < 0.0) THEN
+        soot_conc = sootm_tot(i) / (snowmass(i) - (ei_surft(i) * timestep))
+      ELSE
+        soot_conc = sootm_tot(i) / snowmass(i)
+      END IF
+
+      ! Calculate amount of soot scavenged prior to new snow and soot additions
+      soot_out(i) = (soot_scav * (melt_surft(i) * timestep) * soot_conc)
+
+      IF (cansnowtile .AND. soot_out(i) > sootm_tot(i)) THEN
+        ! To avoid negative soot mass, set soot_out equal to total soot mass
+        soot_out = sootm_tot
+        errcode = -1
+        ERRMSG = 'Soot_out > sootm_tot: setting soot_out = sootm_tot'
+        CALL ereport(routinename, errcode, ERRMSG)
+      END IF
+
+    ELSE
+      soot_out(i) = 0.0
+    END IF
 
     IF (flake_tile) THEN
       IF (lake_h_ice_gb(i) < EPSILON(0.0) ) THEN
@@ -429,6 +477,11 @@ DO k = 1,surft_pts
       !     surface budget.
       IF (sf_diag%l_snice) sf_diag%snice_m_surft(i,surft_n) = 0.0
     END IF
+
+    ! Add freshly fallen soot to existing soot mass in the non-layered snowpack.
+    ! Remove soot that has been scavenged with snow melt.
+    sootm_tot(i) = sootm_tot(i) + (soot_flux_gb(i) * timestep) - soot_out(i)
+
     !
         !-------------------------------------------------------------------------
         ! Melt snow on the ground if appropriate. This is always considered if
@@ -532,6 +585,7 @@ DO k = 1,surft_pts
     IF ( nsmax > 0 ) THEN
       rho0(i)   = rho_snow_grnd(i)
       sice0(i)  = snowmass(i)
+      sm0(i)    = sootm_tot(i)
       tsnow0(i) = MIN( tsoilw, tm )
       IF (l_wtrac_jls) THEN
         DO i_wt = 1,n_wtrac_jls
@@ -729,11 +783,15 @@ DO k = 1,surft_pts
 
     END IF ! l_snow_infilt
 
+    soot_down = 0.0
+
     DO n = 1,nsnow(i)
 
-      sliq(i,n) = sliq(i,n) + win
-      win       = 0.0
-      sliqmax   = snowliqcap * rho_water * ds(i,n)
+      sliq(i,n)      = sliq(i,n) + win
+      soot_mass(i,n) = soot_mass(i,n) + soot_down
+      win            = 0.0
+      soot_down      = 0.0
+      sliqmax        = snowliqcap * rho_water * ds(i,n)
 
       IF (l_wtrac_jls) THEN
         ! Repeat for water tracers
@@ -777,8 +835,15 @@ DO k = 1,surft_pts
           END DO
         END IF
 
-        win       = sliq(i,n) - sliqmax
-        sliq(i,n) = sliqmax
+        soot_conc      = soot_mass(i,n) / (sice(i,n) + sliq(i,n))
+        win            = sliq(i,n) - sliqmax
+        soot_down      = soot_scav * win * soot_conc
+        sliq(i,n)      = sliqmax
+        soot_mass(i,n) = soot_mass(i,n) - soot_down
+
+      ELSE IF ((sliq(i,n) == 0.0) .AND. (sice(i,n) == 0.0)) THEN
+        soot_down = soot_mass(i,n)
+
       END IF
 
       coldsnow = csnow(i,n) * (tm - tsnow(i,n))
@@ -815,6 +880,8 @@ DO k = 1,surft_pts
 
     END DO  !  layers
 
+    soot_out(i) = soot_down
+
     !-------------------------------------------------------------------------
     ! The remaining liquid water flux is melt.
     ! Include any separate canopy melt in this diagnostic.
@@ -848,9 +915,9 @@ DO k = 1,surft_pts
       END IF
     END DO
 
-    !-------------------------------------------------------------------------
-    ! Add snowfall and frost as layer 0.
-    !-------------------------------------------------------------------------
+    !-----------------------------------------------------------------------
+    ! Add snowfall, soot deposition and frost as layer 0.
+    !-----------------------------------------------------------------------
     sice0(i) = snowfall(i)
     IF (l_wtrac_jls) THEN
       DO i_wt = 1,n_wtrac_jls
@@ -871,17 +938,20 @@ DO k = 1,surft_pts
       END IF    !l_wtrac_jls
     END IF
 
+    sm0(i) = soot_flux_gb(i) * timestep
     tsnow0(i) = tsnow(i,1)
     rho0(i)   = rho_snow_fresh
 
-    !-------------------------------------------------------------------------
-    ! Diagnose total snow depth and mass
-    !-------------------------------------------------------------------------
+    !-----------------------------------------------------------------------
+    ! Diagnose total snow depth, snow mass and soot mass
+    !-----------------------------------------------------------------------
     snowdepth(i) = sice0(i) / rho0(i)
     snowmass(i)  = sice0(i)
+    sootm_tot(i) = sm0(i)
     DO n = 1,nsnow(i)
       snowdepth(i) = snowdepth(i) + ds(i,n)
       snowmass(i)  = snowmass(i) + sice(i,n) + sliq(i,n)
+      sootm_tot(i) = sootm_tot(i) + soot_mass(i,n)
     END DO
 
     IF (l_wtrac_jls) THEN

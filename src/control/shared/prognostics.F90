@@ -54,6 +54,10 @@ TYPE :: progs_data_type
     ! Snow layer liquid mass on tiles (kg/m2)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: snowdepth_surft(:,:)
     ! Snow depth on ground on tiles (m)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: soot_mass(:,:,:)
+    ! Snow layer mass of soot on surface tiles (kg/m2)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: sootm_tot(:,:)
+    ! Total soot mass in the snowpack on surface tiles (kg/m2)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: tsnow_surft(:,:,:)
     ! Snow layer temperature (K)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: rgrainl_surft(:,:,:)
@@ -204,6 +208,8 @@ TYPE :: progs_type
   REAL(KIND=real_jlslsm), POINTER :: sice_surft(:,:,:)
   REAL(KIND=real_jlslsm), POINTER ::   sliq_surft(:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: snowdepth_surft(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: soot_mass(:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: sootm_tot(:,:)
   REAL(KIND=real_jlslsm), POINTER :: tsnow_surft(:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: rgrainl_surft(:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: rho_snow_grnd_surft(:,:)
@@ -313,10 +319,12 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 ALLOCATE(progs_data%nsnow_surft(land_pts,nsurft))
 ALLOCATE(progs_data%rho_snow_grnd_surft(land_pts,nsurft))
 ALLOCATE(progs_data%snowdepth_surft(land_pts,nsurft))
+ALLOCATE(progs_data%sootm_tot(land_pts,nsurft))
 ALLOCATE(progs_data%cs_pool_soilt(land_pts,nsoilt,dim_cslayer,dim_cs1))
 progs_data%nsnow_surft(:,:)         = 0
 progs_data%rho_snow_grnd_surft(:,:) = 0.0
 progs_data%snowdepth_surft(:,:)     = 0.0
+progs_data%sootm_tot(:,:)           = 0.0
 progs_data%cs_pool_soilt(:,:,:,:)   = 0.0
 
 ! Additional soil carbon variables
@@ -356,12 +364,14 @@ ALLOCATE(progs_data%ds_surft(temp_size,temp_tiles,temp_layers))
 ALLOCATE(progs_data%rgrainl_surft(temp_size,temp_tiles,temp_layers))
 ALLOCATE(progs_data%sice_surft(temp_size,temp_tiles,temp_layers))
 ALLOCATE(progs_data%sliq_surft(temp_size,temp_tiles,temp_layers))
+ALLOCATE(progs_data%soot_mass(temp_size,temp_tiles,temp_layers))
 ALLOCATE(progs_data%tsnow_surft(temp_size,temp_tiles,temp_layers))
 
 progs_data%ds_surft(:,:,:)      = 0.0
 progs_data%rgrainl_surft(:,:,:) = 0.0
 progs_data%sice_surft(:,:,:)    = 0.0
 progs_data%sliq_surft(:,:,:)    = 0.0
+progs_data%soot_mass(:,:,:)     = 0.0
 progs_data%tsnow_surft(:,:,:)   = 0.0
 
 !See comment in prognostics module
@@ -529,6 +539,8 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DEALLOCATE(progs_data%nsnow_surft)
 DEALLOCATE(progs_data%rho_snow_grnd_surft)
 DEALLOCATE(progs_data%snowdepth_surft)
+DEALLOCATE(progs_data%soot_mass)
+DEALLOCATE(progs_data%sootm_tot)
 DEALLOCATE(progs_data%cs_pool_soilt)
 DEALLOCATE(progs_data%t_soil_soilt_acc)
 DEALLOCATE(progs_data%ns_pool_gb)
@@ -637,6 +649,8 @@ CALL prognostics_nullify(progs)
 progs%nsnow_surft => progs_data%nsnow_surft
 progs%rho_snow_grnd_surft => progs_data%rho_snow_grnd_surft
 progs%snowdepth_surft => progs_data%snowdepth_surft
+progs%soot_mass => progs_data%soot_mass
+progs%sootm_tot => progs_data%sootm_tot
 progs%cs_pool_soilt => progs_data%cs_pool_soilt
 progs%frac_c_label_pool_soilt => progs_data%frac_c_label_pool_soilt
 progs%t_soil_soilt_acc => progs_data%t_soil_soilt_acc
@@ -727,6 +741,8 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 NULLIFY(progs%nsnow_surft)
 NULLIFY(progs%rho_snow_grnd_surft)
 NULLIFY(progs%snowdepth_surft)
+NULLIFY(progs%soot_mass)
+NULLIFY(progs%sootm_tot)
 NULLIFY(progs%cs_pool_soilt)
 NULLIFY(progs%frac_c_label_pool_soilt)
 NULLIFY(progs%t_soil_soilt_acc)

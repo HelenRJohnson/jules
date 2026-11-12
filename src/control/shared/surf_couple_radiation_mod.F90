@@ -243,7 +243,7 @@ CASE ( jules )
     ainfo%land_index, surft_pts, ainfo%surft_index,                            &
     psparms%albsoil_soilt, psparms%albobs_sw_gb, psparms%albobs_vis_gb,        &
     psparms%albobs_nir_gb,                                                     &
-    cosz_gb, soot_gb, jules_vars%ho2r2_orog_gb,                                &
+    cosz_gb, jules_vars%ho2r2_orog_gb,                                         &
     progs%lai_pft, progs%canht_pft,                                            &
     progs%rgrain_surft, snow_surft, progs%tstar_surft, psparms%z0_surft,       &
     ainfo%frac_surft,                                                          &
@@ -262,7 +262,8 @@ CASE ( jules )
     ainfo%l_lice_point, ainfo%l_lice_surft,                                    &
     !prognostics (IN)
     progs%snowdepth_surft, progs%rho_snow_grnd_surft, progs%nsnow_surft,       &
-    progs%sice_surft, progs%sliq_surft, progs%ds_surft)
+    progs%sice_surft, progs%sliq_surft, progs%ds_surft, progs%snow_grnd_surft, &
+    progs%soot_mass, progs%sootm_tot)
 
 
 CASE ( cable )

@@ -2823,6 +2823,14 @@ CASE ( 't_growth_gb' )
     progs%t_growth_gb(:) = const_val
   END IF
 
+CASE ( 'soot_flux' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, psparms%soot_flux_gb)
+  ELSE
+    psparms%soot_flux_gb(:) = const_val
+  END IF
+
   !-----------------------------------------------------------------------------
   !   ECOSSE variables.
   !-----------------------------------------------------------------------------

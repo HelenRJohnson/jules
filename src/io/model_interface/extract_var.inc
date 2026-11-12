@@ -1152,6 +1152,22 @@ CASE ( 'soil_index' )
   cube_land = cube_from_array(workspace_land)
   cube = map_from_land(cube_land)
 
+CASE ( 'soot_flux')
+  cube_land = cube_from_array(psparms%soot_flux_gb)
+  cube = map_from_land(cube_land)
+
+CASE ( 'soot_mass' )
+  cube_land = cube_from_array(progs%soot_mass)
+  cube = map_from_land(cube_land)
+
+CASE ( 'sootm_tot' )
+  cube_land = cube_from_array(progs%sootm_tot)
+  cube = map_from_land(cube_land)
+
+CASE ( 'soot_out' )
+  cube_land = cube_from_array(fluxes%soot_out)
+  cube = map_from_land(cube_land)
+
 CASE ( 'sthzw' )
   IF ( nsoilt == 1) THEN
     cube_land = cube_from_array(soiltiles_to_gbm(toppdm%sthzw_soilt,ainfo))

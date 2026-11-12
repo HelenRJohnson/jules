@@ -12,9 +12,12 @@ MODULE albsnow_ts_mod
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='ALBSNOW_TS_MOD'
 CONTAINS
 SUBROUTINE albsnow_ts (land_pts,snow_pts,snow_index,cosz_gb,                   &
-                       albudir,albudif,rgrain,snowmass,soot_gb,alb_snow)
+                       albudir,albudif,rgrain,snowmass,alb_snow,surft_num,     &
+                       nsurft,nsnow_surft,soot_mass,sootm_tot,                 &
+                       sice_surft,sliq_surft,snow_grnd_surft)
 
-USE jules_snow_mod,       ONLY: cnr_g, cnr_om, dce
+USE jules_snow_mod,       ONLY: cnr_g, cnr_om, dce, cansnowtile, nsmax
+
 USE water_constants_mod,  ONLY: rho_ice
 
 USE jules_science_fixes_mod, ONLY: l_fix_albsnow_ts
@@ -30,12 +33,18 @@ IMPLICIT NONE
 !   Scalar arguments with intent(in):
 INTEGER, INTENT(IN) :: land_pts
                              ! Number of land points.
+INTEGER, INTENT(IN) :: nsurft
+                             ! Number of surface tiles
 INTEGER, INTENT(IN) :: snow_pts
                              ! Number of snow-covered points
+INTEGER, INTENT(IN) :: surft_num
+                             ! Number used to identify the current surfce tile
 
 !   Array arguments with intent(in):
 INTEGER, INTENT(IN) :: snow_index(land_pts)
                              ! Index of land points with snow cover
+INTEGER, INTENT(IN) :: nsnow_surft(land_pts,nsurft)
+                             ! Number of snow layers on ground on tiles
 
 REAL(KIND=real_jlslsm), INTENT(IN) :: albudir(land_pts,2)
                              ! Direct albedos of the substrate
@@ -47,8 +56,16 @@ REAL(KIND=real_jlslsm), INTENT(IN) :: rgrain(land_pts)
                              ! Snow grain size (microns).
 REAL(KIND=real_jlslsm), INTENT(IN) :: snowmass(land_pts)
                              ! Mass loading of snow
-REAL(KIND=real_jlslsm), INTENT(IN) :: soot_gb(land_pts)
-                              ! Snow soot content (kg/kg).
+REAL(KIND=real_jlslsm), INTENT(IN) :: soot_mass(land_pts,nsurft,nsmax)
+                             ! Snow layer mass of soot on surface tiles (kg/m2)
+REAL(KIND=real_jlslsm), INTENT(IN) :: sootm_tot(land_pts,nsurft)
+                             ! Total soot mass on surface tiles (kg/m2)
+REAL(KIND=real_jlslsm), INTENT(IN) :: sice_surft(land_pts,nsurft,nsmax)
+                             ! Snow layer ice mass on tiles (kg/m2)
+REAL(KIND=real_jlslsm), INTENT(IN) :: sliq_surft(land_pts,nsurft,nsmax)
+                             ! Snow layer liquid mass on tiles (kg/m2)
+REAL(KIND=real_jlslsm), INTENT(IN) :: snow_grnd_surft(land_pts,nsurft)
+                             ! Snow on the ground beneath the canopy (kg/m2)
 
 !   Array arguments with intent(out):
 REAL(KIND=real_jlslsm), INTENT(OUT) :: alb_snow(land_pts,4)
@@ -105,6 +122,14 @@ REAL(KIND=real_jlslsm) :: rsd
                              ! Direct-diffuse reflection coefficient
 REAL(KIND=real_jlslsm) :: tsd
                              ! Direct-diffuse transmission coefficient
+REAL(KIND=real_jlslsm) :: snow_mass_top
+                             ! Mass of snow in the top snow layer (kg)
+REAL(KIND=real_jlslsm) :: snow_mass_ground
+                             ! Total mass of snow on the ground for a given
+                             ! surface  tile (kg)
+REAL(KIND=real_jlslsm) :: soot_conc
+                             ! Soot concentration in snow (kg/kg)
+
 
 INTEGER :: band,j,l          ! Loop counters.
 
@@ -120,9 +145,11 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 DO band = 1, 2
 !$OMP PARALLEL DO IF(snow_pts>1) DEFAULT(NONE) SCHEDULE(STATIC)                &
 !$OMP PRIVATE(j,l,deff,log_deff,tau,asym,omega,frwd,beta,beta_s,alpha_1,rsd,   &
-!$OMP alpha_2,alpha_3,alpha_4,lmb,gamma2,pp,rdd,tdd,tss,sigma_1,sigma_2,tsd)   &
+!$OMP alpha_2,alpha_3,alpha_4,lmb,gamma2,pp,rdd,tdd,tss,sigma_1,sigma_2,tsd,   &
+!$OMP snow_mass_top,snow_mass_ground,soot_conc)                                &
 !$OMP SHARED(snow_pts,snow_index,alb_snow,band,albudir,snowmass,cosz_gb,       &
-!$OMP rgrain,cnr_g,cnr_om,soot_gb,albudif,l_fix_albsnow_ts,dce)
+!$OMP rgrain,cnr_g,cnr_om,albudif,l_fix_albsnow_ts,dce,cansnowtile,surft_num,  &
+!$OMP nsnow_surft,sice_surft,sliq_surft,soot_mass,snow_grnd_surft, sootm_tot)
   DO j = 1,snow_pts
     l = snow_index(j)
 
@@ -139,12 +166,28 @@ DO band = 1, 2
       deff     = 2.0 * rgrain(l) * 1.0e-6
       log_deff = LOG(deff)
 
+      !     Calculate soot concentration
+      IF (cansnowtile(surft_num)) THEN
+        snow_mass_ground = snow_grnd_surft(l,surft_num)
+      ELSE
+        snow_mass_ground = snowmass(l)
+      END IF
+      IF ( nsnow_surft(l,surft_num) > 0 ) THEN
+        snow_mass_top = sice_surft(l,surft_num,1) + sliq_surft(l,surft_num,1)
+        soot_conc = soot_mass(l,surft_num,1) / snow_mass_top
+      ELSE IF (snow_mass_ground > 0.0) THEN
+        soot_conc = sootm_tot(l,surft_num) / snow_mass_ground
+      ELSE
+        ! e.g. if there is snow in the canopy but not on the ground
+        soot_conc = 0.0
+      END IF
+
       !     Single scattering properties
       tau   = 3.0 * snowmass(l) / (rho_ice * deff)
       asym  = cnr_g(1,band) + cnr_g(2,band) * log_deff
       omega = 1.0 / (1.0 + cnr_om(1,1,band) + log_deff *                       &
                     (cnr_om(2,1,band) + log_deff * cnr_om(3,1,band)) +         &
-                    deff * cnr_om(2,2,band) * soot_gb(l) / dce)
+                    deff * cnr_om(2,2,band) * soot_conc / dce)
 
       !     Rescale
       frwd  = asym * asym

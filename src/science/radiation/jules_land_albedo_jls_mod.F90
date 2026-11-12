@@ -23,7 +23,7 @@ SUBROUTINE jules_land_albedo(                                                  &
         land_pts, nsurft,                                                      &
         land_index, surft_pts, surft_index,                                    &
         albsoil_soilt, albobs_sw_gb, albobs_vis_gb, albobs_nir_gb,             &
-        cosz_gb, soot_gb, ho2r2_orog_gb,                                       &
+        cosz_gb, ho2r2_orog_gb,                                                &
         lai_pft, canht_pft,                                                    &
         rgrain_surft, snow_surft, tstar_surft, z0_surft, frac_surft,           &
         !INTENT(OUT)
@@ -41,7 +41,7 @@ SUBROUTINE jules_land_albedo(                                                  &
         l_lice_point, l_lice_surft,                                            &
         !prognostics (IN)
         snowdepth_surft, rho_snow_grnd_surft, nsnow_surft, sice_surft,         &
-        sliq_surft, ds_surft)
+        sliq_surft, ds_surft, snow_grnd_surft, soot_mass, sootm_tot)
 
 !Use in subroutines
 USE albpft_mod,               ONLY: albpft
@@ -137,8 +137,6 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                                       !Observed snow-free nir albedo.
   cosz_gb(land_pts),                                                           &
                                       !Cosine of the zenith angle.
-  soot_gb(land_pts),                                                           &
-                                      !Snow soot content (kg/kg).
   ho2r2_orog_gb(land_pts),                                                     &
                                       !Standard deviation of surface orography
   lai_pft(land_pts,npft),                                                      &
@@ -153,9 +151,14 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
                                       !Tile surface temperatures (K).
   z0_surft(land_pts,nsurft),                                                   &
                                       !Surface roughness on tiles (m).
-  frac_surft(land_pts,ntype)
+  frac_surft(land_pts,ntype),                                                  &
                                       !Fractional cover of each surface type.
-
+  snow_grnd_surft(land_pts,nsurft),                                            &
+                                      !Snow beneath canopy (kg/m2)
+  soot_mass(land_pts,nsurft,nsmax),                                            &
+                                      !Mass of soot on snow layers (kg/m2)
+  sootm_tot(land_pts,nsurft)
+                                      !Total soot mass in the snowpack (kg/m2)
 
 !Array arguments with intent(out):
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
@@ -772,7 +775,9 @@ IF (l_spec_albedo) THEN
       CALL albsnow_ts(land_pts, snow_pts(n), snow_index(:,n),cosz_gb,          &
                       albudir(:,:,n),albudif(:,:,n),                           &
                       rgrain_surft(:,n_surft_pft),                             &
-                      snow_mass_alb,soot_gb,alb_snow_surft)
+                      snow_mass_alb,alb_snow_surft,n,nsurft,nsnow_surft,       &
+                      soot_mass,sootm_tot,sice_surft,sliq_surft,               &
+                      snow_grnd_surft)
 
       !     Prepare to calculate the albedo for the exposed canopy. Set
       !     the appropriate exposed LAI and set the snow albedo on
@@ -868,7 +873,9 @@ IF (l_spec_albedo) THEN
         CALL albsnow_ts(land_pts,snow_pts(n),snow_index(:,n),cosz_gb,          &
                         albudir(:,:,n),albudif(:,:,n),                         &
                         rgrain_surft(:,n_surft_pft),                           &
-                        snow_mass_alb,soot_gb,alb_snow_surft)
+                        snow_mass_alb,alb_snow_surft,n,nsurft,nsnow_surft,     &
+                        soot_mass,sootm_tot,sice_surft,sliq_surft,             &
+                        snow_grnd_surft)
         !
         !       Pass the final albedos back into alb_type.
         DO band = 1,4
@@ -919,7 +926,9 @@ IF (l_spec_albedo) THEN
       CALL albsnow_ts(land_pts,snow_pts(n),snow_index(:,n),cosz_gb,            &
                       albudir(:,:,n),albudif(:,:,n),                           &
                       rgrain_surft(:,n_surft_nvg),                             &
-                      snow_surft(:,n_surft_nvg),soot_gb,alb_snow_surft)
+                      snow_surft(:,n_surft_nvg),alb_snow_surft,n,nsurft,       &
+                      nsnow_surft,soot_mass,sootm_tot,sice_surft,sliq_surft,   &
+                      snow_grnd_surft)
 
       !------------------------------------------------------------------------
       ! For land ice surfaces where deep, dense snow may be emulating firn/bare
@@ -1091,7 +1100,9 @@ IF (l_spec_albedo) THEN
       !----------------------------------------------------------------------
       ! Calculate snow albedos
       CALL albsnow(land_pts,nsurft,surft_index,surft_pts,                      &
-                   cosz_gb,rgrain_surft,snowdep_surft,soot_gb,alb_snow)
+                   cosz_gb,rgrain_surft,snowdep_surft,alb_snow,nsnow_surft,    &
+                   soot_mass,sootm_tot,sice_surft,sliq_surft,snow_surft,       &
+                   snow_grnd_surft)
 
       !------------------------------------------------------------------------
       ! For land ice surfaces where deep, dense snow may be emulating firn/bare

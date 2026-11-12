@@ -43,8 +43,8 @@ SUBROUTINE snow ( land_pts, timestep, stf_hf_snow_melt, nsurft, n_wtrac_jls,   &
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
                   lake_h_ice_gb, hcon_lake, ts1_lake_gb, lake_snow_melt,       &
-                  non_lake_frac, lake_h_mxl_gb, lake_depth_gb                  &
-                  )
+                  non_lake_frac, lake_h_mxl_gb, lake_depth_gb, soot_mass,      &
+                  sootm_tot, soot_out, soot_flux_gb)
 
 USE canopysnow_mod,  ONLY: canopysnow
 USE compactsnow_mod, ONLY: compactsnow
@@ -161,8 +161,10 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Surface soil layer volumetric moisture concentration at saturation.
   con_snow_wtrac(land_pts,n_wtrac_jls),                                        &
     ! Water tracer convective snowfall rate (kg/m2/s).
-  ei_surft_wtrac(land_pts,nsurft,n_wtrac_jls)
+  ei_surft_wtrac(land_pts,nsurft,n_wtrac_jls),                                 &
     ! Water tracer sublimation of snow (kg/m2/s).
+  soot_flux_gb(land_pts)
+    ! Mass flux of black carbon deposition onto surface (kg/m2/s).
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(inout)
@@ -233,9 +235,12 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Water tracer snow mass content(kg/m2).
   sice_wtrac(land_pts,nsurft,nsmax,n_wtrac_jls),                               &
     ! Water tracer ice content of snow layers (kg/m2).
-  sliq_wtrac(land_pts,nsurft,nsmax,n_wtrac_jls)
+  sliq_wtrac(land_pts,nsurft,nsmax,n_wtrac_jls),                               &
     ! Water tracer liquid content of snow layers (kg/m2).
-
+  soot_mass(land_pts,nsurft,nsmax),                                            &
+    ! Snow layer mass of soot on surface tiles (kg/m2)
+  sootm_tot(land_pts,nsurft)
+    ! Total soot mass in the snowpack on surface tiles (kg/m2)
 
 !-----------------------------------------------------------------------------
 ! Array arguments with intent(out)
@@ -260,6 +265,8 @@ REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
   snow_soil_htf(land_pts,nsurft),                                              &
     ! Heat flux into the uppermost subsurface layer (W/m2).
     ! i.e. snow to ground, or into snow/soil composite layer.
+  soot_out(land_pts, nsurft),                                                  &
+    ! Soot mass removed from snowpack with melting (kg/m2)
   dhf_surf_minus_soil(land_pts),                                               &
     ! Heat flux difference across the FLake snowpack (W/m2).
   snow_melt_wtrac(land_pts,n_wtrac_jls),                                       &
@@ -339,6 +346,9 @@ REAL(KIND=real_jlslsm) ::                                                      &
   sice0(land_pts),                                                             &
    ! Ice content of fresh snow (kg/m2).
    ! Where nsnow=0, sice0 is the mass of the snowpack.
+  sm0(land_pts,nsurft),                                                        &
+   ! Mass of soot in fresh snow
+   ! Where nsnow=0, sm0 is the mass of soot in the snowpack.
   snow_can(land_pts,nsurft),                                                   &
     ! Canopy snow load (kg/m2).
   tsnow0(land_pts)
@@ -851,11 +861,12 @@ DO n = 1,nsurft
                   melt_surft_wtrac, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,        &
                   wtrac_sn%snowfall, wtrac_sn%snowmass,                        &
                   snow_soil_htf(:,n), rho_snow_sl, rho0, sice0, tsnow0,        &
-                  wtrac_sn%sice0, sf_diag, non_lake_frac,                      &
+                  wtrac_sn%sice0, sf_diag, non_lake_frac, sootm_tot(:,n),      &
+                  sm0(:,n), soot_mass(:,n,:), soot_out(:,n),                   &
                   !Ancil info (IN)
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
-                  lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
+                  lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb, soot_flux_gb)
   ELSE
     CALL snowpack ( n, land_pts, surft_pts(n), n_wtrac_jls, timestep,          &
                   cansnowtile(n), nsnow(:,n), surft_index(:,n), nsurft, csnow, &
@@ -870,11 +881,12 @@ DO n = 1,nsurft
                   melt_surft_wtrac, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,        &
                   wtrac_sn%snowfall, wtrac_sn%snowmass,                        &
                   snow_soil_htf(:,n), rho_snow_sl, rho0, sice0, tsnow0,        &
-                  wtrac_sn%sice0, sf_diag, non_lake_frac,                      &
+                  wtrac_sn%sice0, sf_diag, non_lake_frac, sootm_tot(:,n),      &
+                  sm0(:,n), soot_mass(:,n,:), soot_out(:,n),                   &
                   !Ancil info (IN)
                   l_lice_point, l_lice_surft,                                  &
                   ! Types Variables
-                  lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb)
+                  lake_h_ice_gb, lake_h_mxl_gb, lake_depth_gb, soot_flux_gb)
 
   END IF
 
@@ -912,7 +924,8 @@ DO n = 1,nsurft
                        rgrain(:,n), rgrainl_sl, sice_sl,                       &
                        rho_snow_grnd(:,n), sliq_sl,                            &
                        tsnow_sl, wtrac_sn%sice_sl, wtrac_sn%sliq_sl,           &
-                       rho_snow_sl, snowdepth(:,n) )
+                       rho_snow_sl, snowdepth(:,n), soot_mass(:,n,:),          &
+                       sm0(:,n), sootm_tot(:,n), soot_out(:,n)  )
 
   END IF  !  NSMAX>0
 

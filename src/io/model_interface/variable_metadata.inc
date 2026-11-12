@@ -9354,4 +9354,54 @@ DATA metadata(722) / var_metadata(                                             &
 ! Units
     "kg s-1"                                                                   &
   ) /
+!-----------------------------------------------------------------------------
+! Metadata for soot_flux
+!-----------------------------------------------------------------------------
+DATA metadata(723) / var_metadata(                                             &
+! String identifier
+    'soot_flux',                                                               &
+! Variable type
+    var_type_surface,                                                          &
+! Variable is not available for output, so give dummy values for long name and units
+    "", ""                                                                     &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for soot_mass
+!-----------------------------------------------------------------------------
+DATA metadata(724) / var_metadata(                                             &
+! String identifier
+    'soot_mass',                                                               &
+! Variable type
+    var_type_snow,                                                             &
+! Long Name
+    "Mass of soot on snow layers and surface tiles",                           &
+! Units
+    "kg/m2"                                                                    &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for sootm_tot
+!-----------------------------------------------------------------------------
+DATA metadata(725) / var_metadata(                                             &
+! String identifier
+    'sootm_tot',                                                               &
+! Variable type
+    var_type_surft,                                                            &
+! Long Name
+    "Mass of soot on surface tiles for the total depth of snowpack",           &
+! Units
+    "kg/m2"                                                                    &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for soot_out
+!-----------------------------------------------------------------------------
+DATA metadata(726) / var_metadata(                                             &
+! String identifier
+    'soot_out',                                                                &
+! Variable type
+    var_type_surft,                                                            &
+! Long Name
+    "Mass of soot leaving the bottom of the snowpack",                         &
+! Units
+    "kg/m2"                                                                    &
+  ) /
 #endif
